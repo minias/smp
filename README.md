@@ -1,5 +1,7 @@
 # SMP
 
+<p align="center"><img src="./docs/app.png" alt="app" /></p>
+
 SMP는 Windows 기반 음원 플레이어 애플리케이션입니다.  
 Clean Architecture 구조를 기반으로 설계되었으며, 확장성과 유지보수성을 고려한 모듈 구조를 가지고 있습니다.
 
