@@ -14,6 +14,8 @@ SMP는 Windows 기반 유튜브 링크로 백그라운드 재생하는 음악재
 
 ```sh
 SMP.App/
+├─ yt-dlp.exe # https://github.com/yt-dlp/yt-dlp/releases
+├─ publish.bat # 수동 퍼블리싱
 ├─ Applications/ # UseCase 계층
 ├─ Domain/ # 핵심 도메인 (Entity, ValueObject)
 ├─ Infrastructure/ # 외부 연동 (Audio, Storage, Tray, Youtube)
@@ -133,14 +135,4 @@ git push origin v1.0.0
 
 ## 📄 라이선스
 
-MIT License (또는 프로젝트 정책에 따라 변경)
-
-## 📌 추가 권장 (실무 관점)
-
-원하면 README에 아래도 추가하는 것을 추천한다:
-
-- 아키텍처 다이어그램 (PlantUML)
-- DI 구조 설명
-- 주요 인터페이스 정의
-- 실행 흐름 (Audio pipeline)
-- Tray → UI → Domain 흐름
+MIT License
