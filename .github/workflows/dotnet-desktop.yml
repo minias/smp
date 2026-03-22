@@ -38,9 +38,18 @@ jobs:
     # =========================
     - name: Restore dependencies
       run: dotnet restore $env:PROJECT_PATH
-
+    
     # =========================
-    # 4. Build
+    # 4. dependencies Download
+    # ========================= 
+    - name: Download yt-dlp
+      run: |
+        Invoke-WebRequest `
+          -Uri https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe `
+          -OutFile SMP.App/yt-dlp.exe
+      
+    # =========================
+    # 5. Build
     # =========================
     - name: Build
       run: |
@@ -49,7 +58,7 @@ jobs:
           --no-restore
 
     # =========================
-    # 5. Publish (배포용 산출물 생성)
+    # 6. Publish (배포용 산출물 생성)
     # =========================
     - name: Publish
       run: |
@@ -60,7 +69,7 @@ jobs:
           -o $env:OUTPUT_PATH
 
     # =========================
-    # 6. Upload Artifact
+    # 7. Upload Artifact
     # =========================
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
