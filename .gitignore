@@ -1,0 +1,48 @@
+# =========================
+# Build Output
+# =========================
+**/bin/
+**/obj/
+Output/
+
+# =========================
+# Visual Studio
+# =========================
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# =========================
+# Rider / JetBrains
+# =========================
+.idea/
+
+# =========================
+# .NET
+# =========================
+*.dll
+*.exe
+*.pdb
+*.cache
+*.log
+
+# =========================
+# Publish Profiles (선택)
+# =========================
+# CI/CD에서 관리하지 않을 경우 제외
+SMP.App/Properties/PublishProfiles/*.pubxml
+SMP.App/Properties/PublishProfiles/*.pubxml.user
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Installer Output
+# =========================
+Output/
+*.iss~ 
