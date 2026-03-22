@@ -139,6 +139,7 @@ namespace SMP.UI
             Controls.Add(btnNext);
             Controls.Add(btnStop);
             Icon = (Icon)resources.GetObject("$this.Icon");
+            MaximizeBox = false;
             Name = "MainForm";
             Text = "SMP Player";
             ((System.ComponentModel.ISupportInitialize)trackVolume).EndInit();

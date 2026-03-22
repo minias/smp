@@ -13,12 +13,14 @@ public partial class MainForm : Form
     private readonly YtDlpService _yt;
     private readonly TrayService _tray;
     private readonly PlaylistRepository _repo;
+    private readonly IUpdateService _update; // ✅ 추가
 
     public MainForm(
         PlayerService player,
         YtDlpService yt,
         TrayService tray,
-        PlaylistRepository repo)
+        PlaylistRepository repo,
+        IUpdateService update) // ✅ DI 추가
     {
         InitializeComponent();
 
@@ -30,25 +32,8 @@ public partial class MainForm : Form
         InitTray();
         BindEvents();
 
-        InitVolume();         // ✅ 볼륨 초기화
-        _ = SafeLoadAsync();  // ✅ 안전한 로드
-    }
-
-    /// <summary>
-    /// 트레이 초기화
-    /// </summary>
-    private void InitTray()
-    {
-        var menu = new ContextMenuStrip();
-
-        menu.Items.Add("▶️ 재생", null, async (s, e) => await _player.PlayAsync());
-        menu.Items.Add("⏭️ 다음곡", null, (s, e) => _player.Skip());
-        menu.Items.Add("⏹️ 정지", null, (s, e) => _player.Stop());
-        menu.Items.Add("🪟 열기", null, (s, e) => Show());
-        menu.Items.Add("❌ 종료", null, (s, e) => Application.Exit());
-
-        _tray.SetMenu(menu);
-        _tray.OnDoubleClick(() => Show());
+        InitVolume();         // ✅ 볼륨 초기화        
+        _ = InitializeAsync(); // ✅ 통합 초기화
     }
 
     /// <summary>
@@ -70,6 +55,16 @@ public partial class MainForm : Form
     }
 
     /// <summary>
+    /// 초기화 (플레이리스트 + 업데이트 체크)
+    /// </summary>
+    private async Task InitializeAsync()
+    {
+        await SafeLoadAsync();
+        await CheckUpdateAsync(); // ✅ 추가
+    }
+
+
+    /// <summary>
     /// 안전한 플레이리스트 로드
     /// </summary>
     private async Task SafeLoadAsync()
@@ -89,6 +84,57 @@ public partial class MainForm : Form
             MessageBox.Show($"플레이리스트 로드 실패: {ex.Message}");
         }
     }
+    /// <summary>
+    /// 업데이트 체크
+    /// </summary>
+    private async Task CheckUpdateAsync()
+    {
+        try
+        {
+            var update = await _update.CheckForUpdateAsync();
+
+            if (update == null) return;
+
+            if (IsDisposed) return;
+
+            BeginInvoke(async () =>
+            {
+                var result = MessageBox.Show(
+                    $"새 버전 {update.Version} 발견\n업데이트하시겠습니까?",
+                    "SMP 업데이트",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Information
+                );
+
+                if (result == DialogResult.Yes)
+                {
+                    await _update.DownloadAndInstallAsync(update);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            // 업데이트 실패는 무시 (UX 방해 금지)
+            Console.WriteLine($"[Update] 실패: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 트레이 초기화
+    /// </summary>
+    private void InitTray()
+    {
+        var menu = new ContextMenuStrip();
+
+        menu.Items.Add("▶️ 재생", null, async (s, e) => await _player.PlayAsync());
+        menu.Items.Add("⏭️ 다음곡", null, (s, e) => _player.Skip());
+        menu.Items.Add("⏹️ 정지", null, (s, e) => _player.Stop());
+        menu.Items.Add("🪟 열기", null, (s, e) => ShowMainWindow());        
+        menu.Items.Add("❌ 종료", null, (s, e) => Application.Exit());
+
+        _tray.SetMenu(menu);
+        _tray.OnDoubleClick(() => Show());
+    }
 
     /// <summary>
     /// 최소화 시 트레이
@@ -99,6 +145,24 @@ public partial class MainForm : Form
 
         if (WindowState == FormWindowState.Minimized)
             Hide();
+    }
+
+    /// <summary>
+    /// 트레이 열기 시 창 열기
+    /// </summary>
+    private void ShowMainWindow()
+    {
+        if (InvokeRequired)
+        {
+            Invoke(ShowMainWindow);
+            return;
+        }
+
+        Show();
+        WindowState = FormWindowState.Normal;
+        StartPosition = FormStartPosition.CenterScreen;
+        BringToFront();
+        Activate();
     }
 
     /// <summary>

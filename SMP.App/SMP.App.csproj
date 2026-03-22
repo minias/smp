@@ -10,7 +10,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	<!-- 릴리즈 빌드 -->
 	<Configuration>Release</Configuration>
+	<!-- NuGet / Assembly 공통 버전 -->
+	<Version>1.0.0</Version>
 
+	<!-- 실행 파일 버전 -->
+	<AssemblyVersion>1.0.1.0</AssemblyVersion>
+	<FileVersion>1.0.1.0</FileVersion>
+	<!-- 사용자 표시용 -->
+	<InformationalVersion>1.0.1</InformationalVersion>
+	  
 	<!-- 단일 파일 생성 -->
 	<PublishSingleFile>true</PublishSingleFile>
 
