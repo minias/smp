@@ -1,0 +1,69 @@
+name: .NET Desktop CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        configuration: [Release]
+
+    env:
+      PROJECT_PATH: SMP.App/SMP.App.csproj
+      OUTPUT_PATH: Output
+
+    steps:
+    # =========================
+    # 1. Checkout
+    # =========================
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # =========================
+    # 2. Setup .NET
+    # =========================
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    # =========================
+    # 3. Restore dependencies
+    # =========================
+    - name: Restore dependencies
+      run: dotnet restore $env:PROJECT_PATH
+
+    # =========================
+    # 4. Build
+    # =========================
+    - name: Build
+      run: |
+        dotnet build $env:PROJECT_PATH `
+          -c ${{ matrix.configuration }} `
+          --no-restore
+
+    # =========================
+    # 5. Publish (배포용 산출물 생성)
+    # =========================
+    - name: Publish
+      run: |
+        dotnet publish $env:PROJECT_PATH `
+          -c ${{ matrix.configuration }} `
+          -r win-x64 `
+          --self-contained true `
+          -o $env:OUTPUT_PATH
+
+    # =========================
+    # 6. Upload Artifact
+    # =========================
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: SMP-Build
+        path: ${{ env.OUTPUT_PATH }}
