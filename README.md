@@ -2,8 +2,11 @@
 
 <p align="center"><img src="./docs/app.png" alt="app" /></p>
 
-SMP는 Windows 기반 음원 플레이어 애플리케이션입니다.  
-Clean Architecture 구조를 기반으로 설계되었으며, 확장성과 유지보수성을 고려한 모듈 구조를 가지고 있습니다.
+SMP는 Windows 기반 유튜브 링크로 백그라운드 재생하는 음악재생기입니다.  
+
+상단에 유튜브 링크를 넣고 추가를 하면 리스트에 추가되고 재생을 누르면 유튜브를 방문하지 않아도 실행됩니다.
+
+예> **https://www.youtube.com/watch?v=UbPgeoQE8JU**
 
 ---
 
