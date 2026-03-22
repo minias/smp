@@ -5,65 +5,73 @@ on:
     branches: ["main"]
     tags: ["v*"]
 
+env:
+  PROJECT_PATH: SMP.App/SMP.App.csproj
+  OUTPUT_PATH: Output
+
 jobs:
+
+  # =========================
+  # 1. Build (main 전용)
+  # =========================
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
 
-    env:
-      PROJECT_PATH: SMP.App/SMP.App.csproj
-      OUTPUT_PATH: Output
-
     steps:
-    # =========================
-    # 1. Checkout
-    # =========================
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    # =========================
-    # 2. Setup .NET
-    # =========================
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    - uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 10.0.x
 
-    # =========================
-    # 3. Restore
-    # =========================
     - name: Restore
       run: dotnet restore $env:PROJECT_PATH
 
-    # =========================
-    # 4. Download yt-dlp
-    # =========================
     - name: Download yt-dlp
       run: |
         Invoke-WebRequest `
           -Uri https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe `
           -OutFile SMP.App/yt-dlp.exe
 
-    # =========================
-    # 5. Extract Version (tag only)
-    # =========================
+    - name: Build
+      run: dotnet build $env:PROJECT_PATH -c Release --no-restore
+
+  # =========================
+  # 2. Release (tag 전용)
+  # =========================
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    # ✅ 버전 추출 (항상 실행됨)
     - name: Extract version
       id: version
-      if: startsWith(github.ref, 'refs/tags/')
       run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $env:GITHUB_OUTPUT
 
-    # =========================
-    # 6. Build
-    # =========================
+    - name: Restore
+      run: dotnet restore $env:PROJECT_PATH
+
+    - name: Download yt-dlp
+      run: |
+        Invoke-WebRequest `
+          -Uri https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe `
+          -OutFile SMP.App/yt-dlp.exe
+
     - name: Build
       run: |
         dotnet build $env:PROJECT_PATH `
           -c Release `
           --no-restore `
-          ${{ startsWith(github.ref, 'refs/tags/') && format('/p:Version={0}', steps.version.outputs.VERSION) || '' }}
+          /p:Version=${{ steps.version.outputs.VERSION }}
 
-    # =========================
-    # 7. Publish
-    # =========================
     - name: Publish
       run: |
         dotnet publish $env:PROJECT_PATH `
@@ -71,22 +79,18 @@ jobs:
           -r win-x64 `
           --self-contained true `
           -o $env:OUTPUT_PATH `
-          ${{ startsWith(github.ref, 'refs/tags/') && format('/p:Version={0}', steps.version.outputs.VERSION) || '' }}
+          /p:Version=${{ steps.version.outputs.VERSION }}
 
-    # =========================
-    # 8. Upload Artifact
-    # =========================
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: SMP-Build
+        name: SMP-${{ steps.version.outputs.VERSION }}
         path: ${{ env.OUTPUT_PATH }}
 
-    # =========================
-    # 9. Release (tag only)
-    # =========================
+    # ✅ 릴리즈 생성 (validator 정상 동작 구간)
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: SMP v${{ steps.version.outputs.VERSION }}
         files: Output/**
