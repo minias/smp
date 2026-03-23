@@ -1,0 +1,149 @@
+name: Release and Scan
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  scan-and-update-release:
+    runs-on: windows-latest
+
+    steps:
+      # 1. Release 정보 및 asset 목록 조회
+      - name: Get Release Assets
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const release = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id
+            });
+
+            return release.data;
+
+      # 2. Asset 다운로드
+      - name: Download Assets
+        id: download
+        run: |
+          $assets = '${{ steps.release.outputs.result }}' | ConvertFrom-Json
+
+          $results = @()
+
+          foreach ($asset in $assets.assets) {
+
+            if ($asset.name -notmatch '\.(exe|zip)$') {
+              continue
+            }
+
+            Write-Host "Downloading $($asset.name)"
+
+            Invoke-WebRequest `
+              -Uri $asset.browser_download_url `
+              -OutFile $asset.name
+
+            $hash = (Get-FileHash $asset.name -Algorithm SHA256).Hash
+
+            $results += [PSCustomObject]@{
+              name = $asset.name
+              hash = $hash
+            }
+          }
+
+          $results | ConvertTo-Json | Out-File results.json
+
+      # 3. VirusTotal 조회
+      - name: VirusTotal Scan
+        id: vt
+        run: |
+          $results = Get-Content results.json | ConvertFrom-Json
+
+          $final = @()
+
+          foreach ($item in $results) {
+
+            $hash = $item.hash
+
+            $response = curl -s -X GET "https://www.virustotal.com/api/v3/files/$hash" `
+              -H "x-apikey: ${{ secrets.VT_API_KEY }}"
+
+            $json = $response | ConvertFrom-Json
+
+            $stats = $json.data.attributes.last_analysis_stats
+
+            $final += [PSCustomObject]@{
+              name = $item.name
+              hash = $hash
+              malicious = $stats.malicious
+              suspicious = $stats.suspicious
+            }
+          }
+
+          $final | ConvertTo-Json | Out-File vt_results.json
+
+      # 4. 악성 여부 체크 (rollback 판단)
+      - name: Check Malicious
+        id: check
+        run: |
+          $results = Get-Content vt_results.json | ConvertFrom-Json
+
+          $maliciousTotal = ($results | Measure-Object -Property malicious -Sum).Sum
+
+          echo "malicious_total=$maliciousTotal" >> $env:GITHUB_OUTPUT
+
+      # 5. 릴리즈 롤백 (malicious > 0)
+      - name: Rollback Release if Malicious
+        if: steps.check.outputs.malicious_total != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.deleteRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id
+            });
+
+      # 6. 릴리즈 노트 생성 (marker 기반 replace)
+      - name: Update Release Notes
+        if: steps.check.outputs.malicious_total == '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const vtResults = JSON.parse(fs.readFileSync('vt_results.json', 'utf8'));
+
+            let report = `\n<!-- VT-REPORT-START -->\n`;
+            report += `### 🔐 VirusTotal Scan Result\n\n`;
+            report += `| File | SHA256 | Malicious | Suspicious |\n`;
+            report += `|------|--------|-----------|------------|\n`;
+
+            vtResults.forEach(r => {
+              report += `| ${r.name} | \`${r.hash}\` | ${r.malicious} | ${r.suspicious} |\n`;
+            });
+
+            report += `\n<!-- VT-REPORT-END -->\n`;
+
+            const release = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id
+            });
+
+            let body = release.data.body || "";
+
+            // 기존 VT 섹션 제거 (중복 방지)
+            body = body.replace(/<!-- VT-REPORT-START -->[\s\S]*<!-- VT-REPORT-END -->/g, "");
+
+            body += report;
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: body
+            });
