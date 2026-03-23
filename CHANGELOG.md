@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.0] - 2026-03-24
+
+### Bug Fixes
+- 없음
+
+### Improvements
+- Create release.yml
+- release.ps1 , publish.ps1 update
+
+# Changelog
+
 ## [1.0.3] - 2026-03-23
 
 ### Bug Fixes
@@ -46,3 +57,4 @@
 - 플레이리스트 관리
 - 트레이 기능
 - 유튜브 연동
+

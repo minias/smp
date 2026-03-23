@@ -1,3 +1,5 @@
+// File: Program.cs
+
 using Microsoft.Extensions.DependencyInjection;
 using SMP.App;
 using SMP.App.Interfaces;
@@ -10,8 +12,10 @@ using SMP.UI;
 
 var services = new ServiceCollection();
 
-// yt-dlp
+// yt-dlp 실행 파일 경로
 var exePath = Path.Combine(AppContext.BaseDirectory, "yt-dlp.exe");
+
+// ✅ 생성자 시그니처에 맞게 exePath만 전달
 services.AddSingleton(new YtDlpService(exePath));
 
 // core

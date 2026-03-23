@@ -6,6 +6,7 @@ csproj Version 기반 자동 publish 스크립트
 - SMP.csproj의 <Version> 값을 읽어서 사용
 - AssemblyVersion / FileVersion 동기화
 - self-contained single file publish
+- Git과 완전히 분리된 빌드 산출 스크립트
 #>
 
 param (
@@ -16,7 +17,7 @@ param (
 )
 
 # -----------------------------
-# csproj에서 Version 추출
+# csproj Version 추출 (안정화)
 # -----------------------------
 function Get-VersionFromCsproj {
     param ([string]$Path)
@@ -25,23 +26,16 @@ function Get-VersionFromCsproj {
         throw "csproj not found: $Path"
     }
 
-    # XML 로드
-    [xml]$xml = Get-Content $Path
+    # XML 안정 로딩
+    [xml]$xml = [xml](Get-Content $Path -Raw)
 
-    # Version 노드 탐색
-    $versionNode = $xml.Project.PropertyGroup.Version
-
-    if (-not $versionNode) {
-        throw "<Version> not found in csproj"
+    foreach ($pg in $xml.Project.PropertyGroup) {
+        if ($pg.Version -and -not [string]::IsNullOrWhiteSpace($pg.Version)) {
+            return $pg.Version.Trim()
+        }
     }
 
-    $version = $versionNode.Trim()
-
-    if ([string]::IsNullOrWhiteSpace($version)) {
-        throw "<Version> is empty"
-    }
-
-    return $version
+    throw "<Version> not found in csproj"
 }
 
 # -----------------------------
@@ -52,10 +46,29 @@ $VERSION = Get-VersionFromCsproj -Path $ProjectPath
 Write-Host "📌 csproj Version: $VERSION"
 
 # -----------------------------
-# Output 폴더 준비
+# Version 포맷 검증 및 분리
+# -----------------------------
+if ($VERSION -notmatch '^\d+\.\d+\.\d+$') {
+    throw "Invalid version format (expected x.y.z): $VERSION"
+}
+
+$versionParts = $VERSION.Split(".")
+
+$assemblyVersion = "$($versionParts[0]).$($versionParts[1]).$($versionParts[2]).0"
+$fileVersion     = "$($versionParts[0]).$($versionParts[1]).$($versionParts[2]).0"
+
+Write-Host "📌 AssemblyVersion: $assemblyVersion"
+Write-Host "📌 FileVersion: $fileVersion"
+
+# -----------------------------
+# Output 폴더 정리
 # -----------------------------
 if (Test-Path $OutputPath) {
-    Remove-Item $OutputPath -Recurse -Force
+    try {
+        Remove-Item $OutputPath -Recurse -Force -ErrorAction Stop
+    } catch {
+        throw "Failed to clean output folder: $OutputPath"
+    }
 }
 
 New-Item -ItemType Directory -Path $OutputPath | Out-Null
@@ -63,15 +76,17 @@ New-Item -ItemType Directory -Path $OutputPath | Out-Null
 # -----------------------------
 # Publish 실행
 # -----------------------------
-dotnet publish $ProjectPath `
+Write-Host "🚀 Starting publish..."
+
+& dotnet publish $ProjectPath `
     -c $Configuration `
     -r $Runtime `
     --self-contained true `
     -o $OutputPath `
     /p:PublishSingleFile=true `
     /p:Version=$VERSION `
-    /p:AssemblyVersion="$VERSION.0" `
-    /p:FileVersion="$VERSION.0"
+    /p:AssemblyVersion=$assemblyVersion `
+    /p:FileVersion=$fileVersion
 
 # -----------------------------
 # 결과 확인
