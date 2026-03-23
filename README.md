@@ -1,6 +1,6 @@
 # SMP
 
-<p align="center"><img src="./docs/app.png" alt="app" /></p>
+<p align="center"><img src="./docs/app.1.1.0.png" alt="app" /></p>
 
 SMP는 Windows 기반 유튜브 링크로 백그라운드 재생하는 음악재생기입니다.  
 

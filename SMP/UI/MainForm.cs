@@ -72,7 +72,7 @@ public partial class MainForm : Form
     private async Task InitializeAsync()
     {
         await SafeLoadAsync();
-        await CheckUpdateAsync();
+        //await CheckUpdateAsync(); // 자동 업데이트 임시로 막음
     }
 
     /// <summary>

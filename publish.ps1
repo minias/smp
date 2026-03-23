@@ -12,8 +12,8 @@ csproj Version 기반 자동 publish 스크립트
 param (
     [string]$ProjectPath = "SMP/SMP.csproj",
     [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64",
-    [string]$OutputPath = "Output"
+    [string]$Runtime = "win-x64"
+    #[string]$OutputPath = "Output"
 )
 
 # -----------------------------
