@@ -2,7 +2,7 @@
 using SMP.Domain;
 using System.Text.Json;
 using SMP.Infrastructure.Serialization;
-
+using System.Diagnostics;
 
 namespace SMP.Infrastructure.Storage;
 
@@ -49,10 +49,14 @@ public class PlaylistRepository
     /// </summary>
     public async Task<List<PlaylistItem>> LoadAsync()
     {
+        // 🔍 디버깅 로그 (디버그 모드에서만 실행됨)
+        Debug.WriteLine($"[DEBUG] Load called: {_filePath}");
+
         if (!File.Exists(_filePath))
             return [];
 
         var json = await File.ReadAllTextAsync(_filePath);
+        Debug.WriteLine($"[DEBUG] raw json: {json}");
 
         return JsonSerializer.Deserialize<List<PlaylistItem>>(json)
                ?? [];

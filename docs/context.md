@@ -5,7 +5,7 @@
 - Platform: Windows (WinForms)
 - Runtime: .NET 10
 - Architecture: Clean Architecture
-
+- Github : https://github.com/minias/smp
 ---
 
 ## 🧱 Architecture
@@ -24,6 +24,7 @@ Infrastructure
  ├── Audio
  ├── Storage
  ├── Update
+ ├── Serialization
  ├── Tray
  └── Config
 
@@ -80,25 +81,17 @@ UI
 
 ## 🐞 Known Issues
 
-- 트레이 아이콘 Dispose 문제 (해결됨)
-- UI Resize 깨짐 (고정 사이즈 적용)
-- 긴 대화 시 ChatGPT 성능 저하
+- 플레이리스트 저장 후 실행시 비어있는값으로 변경됨
+- 플레이리스트 구조 변경
 
 ---
 
 ## 🚧 Current Work
 
-- UpdateService 안정화
-- TrayService lifecycle 개선
-- GitHub Release 자동 배포
 
 ---
 
 ## 🎯 Next Goals
-
-- 자동 업데이트 무중단 적용
-- 다운로드 진행 UI 추가
-- 설정 파일 관리 분리
 
 ---
 
@@ -108,10 +101,3 @@ UI
 - UI는 최소 로직만 유지
 - Infrastructure는 외부 의존성 담당
 
----
-
-# 🔥 변경 요약
-
-## 추가된 구조
-```sh
-Infrastructure/Serialization

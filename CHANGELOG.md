@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.3] - 2026-03-23
+
+### Bug Fixes
+- 
+
+### Improvements
+- 
+
+
 ## [1.0.2] - 2026-03-23
 
 ### Bug Fixes

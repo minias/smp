@@ -1,13 +1,13 @@
 [Setup]
 AppName=SMP
-AppVersion=1.0.2
+AppVersion=1.0.3
 
 ; ✅ 64bit 기준 Program Files 사용
 DefaultDirName={autopf}\SMP
 
 DefaultGroupName=SMP
 OutputDir=Output
-OutputBaseFilename=SMP_Setup_1.0.2
+OutputBaseFilename=SMP_Setup_1.0.3
 
 ; ✅ 권한 상승 (Program Files 설치를 위해 필요)
 PrivilegesRequired=admin
