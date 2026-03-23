@@ -1,3 +1,6 @@
 <Solution>
-  <Project Path="SMP.App/SMP.App.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="SMP/SMP.csproj" />
 </Solution>

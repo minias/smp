@@ -1,6 +1,9 @@
 ﻿// Infrastructure/Update/GithubReleaseClient.cs
+using SMP.Domain.Entities;
 using System.Net.Http;
 using System.Text.Json;
+
+namespace SMP.Infrastructure.Update;
 
 public class GithubReleaseClient
 {

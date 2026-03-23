@@ -1,16 +1,25 @@
-﻿// Applications/PlayerService.cs
+﻿// App/PlayerService.cs
+
 using SMP.Domain;
 using SMP.Infrastructure.Audio;
 using SMP.Infrastructure.Youtube;
 using NAudio.Wave;
 
-namespace SMP.Applications;
+namespace SMP.App.Service;
 
+/// <summary>
+/// 플레이어 서비스
+/// - 플레이리스트 관리
+/// - 유튜브 스트림 변환
+/// - 오디오 재생 제어
+/// </summary>
 public class PlayerService
 {
     private readonly StreamingAudioPlayer _player;
     private readonly YtDlpService _yt;
+
     public event Action<PlaylistItem>? OnTrackChanged;
+
     // 플레이리스트 (FIFO)
     private readonly Queue<PlaylistItem> _playlist = new();
 
@@ -19,9 +28,15 @@ public class PlayerService
 
     private bool _isPlaying = false;
 
+    /// <summary>
+    /// 생성자
+    /// </summary>
     public PlayerService(YtDlpService yt)
     {
-        _player = new StreamingAudioPlayer();
+        // ✅ 수정: IWavePlayer 전달
+        var waveOut = new WaveOutEvent();
+        _player = new StreamingAudioPlayer(waveOut);
+
         _yt = yt;
 
         // 재생 종료 시 다음 곡 자동 실행
@@ -61,7 +76,7 @@ public class PlayerService
         _isPlaying = true;
         _current = _playlist.Dequeue();
 
-        OnTrackChanged?.Invoke(_current); // ✅ 이벤트 발생
+        OnTrackChanged?.Invoke(_current);
 
         for (int i = 0; i < 2; i++)
         {
@@ -69,7 +84,8 @@ public class PlayerService
 
             if (!string.IsNullOrWhiteSpace(streamUrl))
             {
-                _player.Play(streamUrl);
+                // ✅ 수정: Play → PlayAsync
+                await _player.PlayAsync(streamUrl);
                 return;
             }
         }
@@ -82,7 +98,6 @@ public class PlayerService
     /// </summary>
     private async void HandleNext(object? sender, StoppedEventArgs e)
     {
-        // Stop() 호출로 들어온 이벤트는 무시할 수도 있음 (확장 포인트)
         await PlayNext();
     }
 

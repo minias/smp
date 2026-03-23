@@ -17,17 +17,16 @@ SMP.App/
 ├─ yt-dlp.exe # https://github.com/yt-dlp/yt-dlp/releases
 ├─ publish.bat # 수동 퍼블리싱
 ├─ Applications/ # UseCase 계층
-├─ Domain/ # 핵심 도메인 (Entity, ValueObject)
+│  └─Interfaces # 현재는 업데이트 인터페이스 만
+├─ Domain/ # 오디오,플레이리스트 아이템 
+│  └─Entities  # 각종 엔티티
 ├─ Infrastructure/ # 외부 연동 (Audio, Storage, Tray, Youtube)
-│ ├─ Audio
-│ ├─ Storage
-│ ├─ Tray
-│ └─ Youtube
+│  ├─Audio         # 음원 플레이
+│  ├─Storage       # 플레이리스트 저장/수정/삭제
+│  ├─Tray          # 트레이 로직
+│  ├─Update        # 자동 업데이트 로직
+│  └─Youtube       # 유튜브 링크에서 음원 추출 로직
 ├─ UI/ # Presentation Layer (WPF/WinForms)
-├─ Properties/
-│ └─ PublishProfiles
-├─ bin/ # 빌드 결과 (Git 제외)
-└─ obj/ # 빌드 캐시 (Git 제외)
 ```
 
 ---
@@ -105,32 +104,6 @@ Output/SMP_Setup.exe
 
 ```sh
 dotnet test
-```
-
-## 설계 원칙
-
-- Clean Architecture 준수
-- 의존성 역전 원칙(DIP) 적용
-- 계층 간 직접 참조 최소화
-- 인터페이스 기반 설계
-
-## 📁 Git 관리 정책
-
-다음 항목은 Git에 포함되지 않습니다:
-
-- bin/
-- obj/
-- Output/
-
-이는 빌드 산출물이며 재생성 가능한 데이터입니다.
-
-## 📌 버전 관리
-
-태그 기반 릴리즈:
-
-```sh
-git tag v1.0.0
-git push origin v1.0.0
 ```
 
 ## 📄 라이선스

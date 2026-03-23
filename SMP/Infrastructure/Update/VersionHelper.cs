@@ -1,4 +1,8 @@
 ﻿// Infrastructure/Update/VersionHelper.cs
+using SMP.Infrastructure.Update;
+
+namespace SMP.Infrastructure.Update;
+
 public static class VersionHelper
 {
     public static bool IsUpdateAvailable(string current, string latest)

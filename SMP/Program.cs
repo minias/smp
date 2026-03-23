@@ -1,7 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
-using SMP.Applications;
+using SMP.App;
+using SMP.App.Interfaces;
+using SMP.App.Service;
 using SMP.Infrastructure.Storage;
 using SMP.Infrastructure.Tray;
+using SMP.Infrastructure.Update;
 using SMP.Infrastructure.Youtube;
 using SMP.UI;
 
@@ -16,7 +19,8 @@ services.AddSingleton<PlayerService>();
 
 // infra
 services.AddSingleton<TrayService>();
-services.AddSingleton<PlaylistRepository>(); // ✅ 이거 빠져있음
+services.AddSingleton<PlaylistRepository>();
+services.AddSingleton<IUpdateService, UpdateService>();
 
 // UI
 services.AddSingleton<MainForm>();

@@ -1,4 +1,6 @@
 ﻿// Domain/Entities/UpdateInfo.cs
+namespace SMP.Domain.Entities;
+
 public class UpdateInfo
 {
     public string Version { get; set; } = string.Empty;

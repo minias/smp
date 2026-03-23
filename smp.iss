@@ -1,13 +1,13 @@
 [Setup]
 AppName=SMP
-AppVersion=1.0.1
+AppVersion=1.0.2
 
 ; ✅ 64bit 기준 Program Files 사용
 DefaultDirName={autopf}\SMP
 
 DefaultGroupName=SMP
 OutputDir=Output
-OutputBaseFilename=SMP_Setup_1.0.1
+OutputBaseFilename=SMP_Setup_1.0.2
 
 ; ✅ 권한 상승 (Program Files 설치를 위해 필요)
 PrivilegesRequired=admin
@@ -23,7 +23,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 
 [Files]
 ; ✅ publish 폴더 전체 복사
-Source: "SMP.App\bin\Release\net10.0-windows\win-x64\publish\*"; \
+Source: "SMP\bin\Release\net10.0-windows\win-x64\publish\*"; \
 DestDir: "{app}"; \
 Flags: ignoreversion recursesubdirs createallsubdirs
 

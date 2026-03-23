@@ -1,6 +1,8 @@
 ﻿// Infrastructure/Storage/PlaylistRepository.cs
 using SMP.Domain;
 using System.Text.Json;
+using SMP.Infrastructure.Serialization;
+
 
 namespace SMP.Infrastructure.Storage;
 
@@ -28,18 +30,19 @@ public class PlaylistRepository
         _filePath = Path.Combine(appDataDir, "playlist.json");
     }
 
+
     /// <summary>
     /// 플레이리스트 저장
     /// </summary>
     public async Task SaveAsync(IEnumerable<PlaylistItem> items)
     {
-        var json = JsonSerializer.Serialize(items, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+        // ✅ JsonOptionsProvider 사용 (CA1869 해결)
+        var json = JsonSerializer.Serialize(items, JsonOptionsProvider.Default);
 
+        // TODO: 안정성 향상 (temp 파일 → replace 방식 고려 가능)
         await File.WriteAllTextAsync(_filePath, json);
     }
+
 
     /// <summary>
     /// 플레이리스트 로드
@@ -47,11 +50,11 @@ public class PlaylistRepository
     public async Task<List<PlaylistItem>> LoadAsync()
     {
         if (!File.Exists(_filePath))
-            return new List<PlaylistItem>();
+            return [];
 
         var json = await File.ReadAllTextAsync(_filePath);
 
         return JsonSerializer.Deserialize<List<PlaylistItem>>(json)
-               ?? new List<PlaylistItem>();
+               ?? [];
     }
 }
