@@ -4,11 +4,19 @@ SMP 자동 릴리즈 스크립트 (Production Ready)
 
 .DESCRIPTION
 - semantic version bump
-- changelog update
+- commit 기반 CHANGELOG 자동 생성
 - git commit / tag / push
 - PowerShell 5.1 / 7 호환
 - UTF-8 출력 지원
 - 안정성 강화
+
+(1) Version 계산
+(2) SMP.csproj <Version> 업데이트   ← 추가
+(3) CHANGELOG 업데이트
+(4) git add
+(5) git commit
+(6) git tag
+(7) push
 #>
 
 param (
@@ -141,6 +149,35 @@ function Update-Version {
 }
 
 # -----------------------------
+# ✅ csproj Version 업데이트 (추가)
+# -----------------------------
+function Update-CsprojVersion {
+    param (
+        [string]$ProjectPath,
+        [string]$Version
+    )
+
+    if (-not (Test-Path $ProjectPath)) {
+        throw "csproj not found: $ProjectPath"
+    }
+
+    [xml]$xml = Get-Content $ProjectPath
+
+    $pg = $xml.Project.PropertyGroup
+
+    if (-not $pg.Version) {
+        throw "<Version> not found in csproj"
+    }
+
+    # Version 값만 업데이트
+    $pg.Version = $Version
+
+    $xml.Save($ProjectPath)
+
+    Write-Host "🧩 csproj Version updated → $Version"
+}
+
+# -----------------------------
 # Git Repo Check
 # -----------------------------
 if (-not (Test-Path ".git")) {
@@ -167,7 +204,7 @@ if ($DryRun) {
 }
 
 # -----------------------------
-# CHANGELOG Update
+# CHANGELOG Update (commit 기반 자동 생성)
 # -----------------------------
 if (-not $SkipChangelog) {
 
@@ -189,26 +226,54 @@ if (-not $SkipChangelog) {
         throw "CHANGELOG already contains version $newVersion"
     }
 
-    if ($content -notmatch "# Changelog") {
-        throw "CHANGELOG header not found."
+    # 이전 태그 이후 commit 로그 가져오기
+    $commitLogs = Invoke-Git @("log", "$latestTag..HEAD", "--pretty=format:%s")
+
+    if (-not $commitLogs) {
+        $commitLogs = @()
     }
 
+    # 분류
+    $bugFixes = @()
+    $improvements = @()
+
+    foreach ($log in $commitLogs) {
+
+        $lower = $log.ToLower()
+
+        if ($lower.StartsWith("fix")) {
+            $bugFixes += "- $log"
+        }
+        elseif ($lower.StartsWith("feat")) {
+            $improvements += "- $log"
+        }
+        else {
+            $improvements += "- $log"
+        }
+    }
+
+    # 섹션 구성
+    $bugFixSection = if ($bugFixes.Count -gt 0) { $bugFixes -join "`n" } else { "- 없음" }
+    $improveSection = if ($improvements.Count -gt 0) { $improvements -join "`n" } else { "- 없음" }
+
+    # CHANGELOG 블록 생성
     $header = @"
 ## [$newVersion] - $today
 
 ### Bug Fixes
-- 
+$bugFixSection
 
 ### Improvements
-- 
+$improveSection
 
 "@
 
-    $updated = $content -replace "# Changelog", "# Changelog`n`n$header"
+    # prepend 방식 (맨 위 삽입)
+    $updated = "# Changelog`n`n$header`n$content"
 
     Set-Content -Path $changelogPath -Value $updated -Encoding UTF8
 
-    Write-Host "📝 CHANGELOG updated"
+    Write-Host "📝 CHANGELOG auto-generated from commits"
 }
 else {
     Write-Host "⏭️ Skip CHANGELOG"
