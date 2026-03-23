@@ -1,120 +1,197 @@
 <#
 .SYNOPSIS
-SMP 자동 릴리즈 스크립트 (Advanced)
+SMP 자동 릴리즈 스크립트 (Production Ready)
 
-.PARAMETER Type
-Version bump type: patch | minor | major
-
-.PARAMETER DryRun
-실제 변경 없이 시뮬레이션
-
-.PARAMETER NoPush
-git push 생략
-
-.PARAMETER SkipChangelog
-CHANGELOG 업데이트 생략
+.DESCRIPTION
+- semantic version bump
+- changelog update
+- git commit / tag / push
+- PowerShell 5.1 / 7 호환
+- UTF-8 출력 지원
+- 안정성 강화
 #>
 
 param (
-    [Parameter(Mandatory=$true)]
     [ValidateSet("patch", "minor", "major")]
     [string]$Type,
 
     [switch]$DryRun,
     [switch]$NoPush,
-    [switch]$SkipChangelog
+    [switch]$SkipChangelog,
+    [switch]$Help
 )
 
 # -----------------------------
-# Usage
+# Help
 # -----------------------------
-function Show-Usage {
-    Write-Host ""
-    Write-Host "SMP Release Script"
-    Write-Host "==================="
-    Write-Host ""
-    Write-Host "Usage:"
-    Write-Host "  .\release.ps1 -Type patch"
-    Write-Host "  .\release.ps1 -Type minor"
-    Write-Host "  .\release.ps1 -Type major"
-    Write-Host ""
-    Write-Host "Options:"
-    Write-Host "  -DryRun          실제 변경 없이 시뮬레이션"
-    Write-Host "  -NoPush          git push 생략"
-    Write-Host "  -SkipChangelog   CHANGELOG 업데이트 생략"
-    Write-Host ""
-    Write-Host "Examples:"
-    Write-Host "  .\release.ps1 -Type patch -DryRun"
-    Write-Host "  .\release.ps1 -Type minor -NoPush"
-    Write-Host "  .\release.ps1 -Type major -SkipChangelog"
-    Write-Host ""
-    exit 1
+function Show-Help {
+    Write-Host @"
+SMP Release Script
+
+USAGE:
+  .\release.ps1 -Type <patch|minor|major> [options]
+
+OPTIONS:
+  -Type              Version bump type (patch | minor | major)
+  -DryRun            Simulate without applying changes
+  -NoPush            Skip git push
+  -SkipChangelog     Do not update CHANGELOG.md
+  -Help              Show help
+
+EXAMPLES:
+  .\release.ps1 -Type patch
+  .\release.ps1 -Type minor -DryRun
+  .\release.ps1 -Type major -NoPush
+"@
 }
 
 # -----------------------------
-# Git 저장소 체크
+# Help / Argument Validation
+# -----------------------------
+if ($Help -or -not $Type) {
+    Show-Help
+    exit 0
+}
+
+# -----------------------------
+# Encoding Setup (UTF-8)
+# -----------------------------
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+cmd /c chcp 65001 | Out-Null
+
+# -----------------------------
+# Global Settings
+# -----------------------------
+$ErrorActionPreference = "Stop"
+
+# -----------------------------
+# Git 실행 Wrapper
+# -----------------------------
+function Invoke-Git {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string[]]$GitArgs
+    )
+
+    $result = & git @GitArgs 2>&1
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git command failed: git $($GitArgs -join ' ')`n$result"
+    }
+
+    return $result
+}
+
+# -----------------------------
+# Get Latest Tag
+# -----------------------------
+function Get-LatestTag {
+    try {
+        $tag = Invoke-Git @("describe", "--tags", "--abbrev=0")
+        return $tag.Trim()
+    }
+    catch {
+        return "v0.0.0"
+    }
+}
+
+# -----------------------------
+# Parse Version
+# -----------------------------
+function Get-VersionInfo {
+    param ([string]$tag)
+
+    $clean = $tag.TrimStart("v")
+    $parts = $clean.Split(".")
+
+    if ($parts.Count -ne 3) {
+        throw "Invalid version format: $tag"
+    }
+
+    return @{
+        Major = [int]$parts[0]
+        Minor = [int]$parts[1]
+        Patch = [int]$parts[2]
+    }
+}
+
+# -----------------------------
+# Version Bump
+# -----------------------------
+function Update-Version {
+    param ($version, $type)
+
+    switch ($type) {
+        "major" {
+            $version.Major++
+            $version.Minor = 0
+            $version.Patch = 0
+        }
+        "minor" {
+            $version.Minor++
+            $version.Patch = 0
+        }
+        "patch" {
+            $version.Patch++
+        }
+    }
+
+    return $version
+}
+
+# -----------------------------
+# Git Repo Check
 # -----------------------------
 if (-not (Test-Path ".git")) {
-    Write-Error "Git 저장소가 아닙니다."
-    exit 1
+    throw "Git repository not found."
 }
 
 # -----------------------------
-# 최신 태그 조회
+# Version Calculation
 # -----------------------------
-$latestTag = git describe --tags --abbrev=0 2>$null
-if (-not $latestTag) {
-    $latestTag = "v0.0.0"
-}
+$latestTag = Get-LatestTag
+Write-Host "📌 Latest Tag: $latestTag"
 
-$version = $latestTag.TrimStart("v").Split(".")
+$version = Get-VersionInfo $latestTag
+$newVersionObj = Update-Version $version $Type
 
-[int]$major = $version[0]
-[int]$minor = $version[1]
-[int]$patch = $version[2]
-
-# -----------------------------
-# Semantic Version 증가
-# -----------------------------
-switch ($Type) {
-    "major" {
-        $major++
-        $minor = 0
-        $patch = 0
-    }
-    "minor" {
-        $minor++
-        $patch = 0
-    }
-    "patch" {
-        $patch++
-    }
-}
-
-$newVersion = "$major.$minor.$patch"
+$newVersion = "{0}.{1}.{2}" -f $newVersionObj.Major, $newVersionObj.Minor, $newVersionObj.Patch
 $newTag = "v$newVersion"
 
 Write-Host "🚀 Target Version: $newTag"
 
 if ($DryRun) {
-    Write-Host "🧪 DRY RUN - 실제 변경 없음"
+    Write-Host "🧪 DRY RUN - no changes applied"
     exit 0
 }
 
 # -----------------------------
-# CHANGELOG 업데이트
+# CHANGELOG Update
 # -----------------------------
 if (-not $SkipChangelog) {
 
     $changelogPath = "CHANGELOG.md"
 
     if (-not (Test-Path $changelogPath)) {
-        Write-Error "CHANGELOG.md 파일이 없습니다."
-        exit 1
+        throw "CHANGELOG.md not found."
     }
 
     $today = Get-Date -Format "yyyy-MM-dd"
     $content = Get-Content $changelogPath -Raw
+
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        throw "CHANGELOG.md is empty."
+    }
+
+    # 중복 버전 방지
+    if ($content -match "## \[$newVersion\]") {
+        throw "CHANGELOG already contains version $newVersion"
+    }
+
+    if ($content -notmatch "# Changelog") {
+        throw "CHANGELOG header not found."
+    }
 
     $header = @"
 ## [$newVersion] - $today
@@ -127,42 +204,49 @@ if (-not $SkipChangelog) {
 
 "@
 
-    $newContent = $content -replace "# Changelog", "# Changelog`n`n$header"
-    Set-Content -Path $changelogPath -Value $newContent
+    $updated = $content -replace "# Changelog", "# Changelog`n`n$header"
 
-    Write-Host "📝 CHANGELOG 업데이트 완료"
+    Set-Content -Path $changelogPath -Value $updated -Encoding UTF8
+
+    Write-Host "📝 CHANGELOG updated"
 }
 else {
-    Write-Host "⏭️ CHANGELOG 업데이트 스킵"
+    Write-Host "⏭️ Skip CHANGELOG"
 }
 
 # -----------------------------
-# Git add / commit
+# Git Add
 # -----------------------------
-git add .
-git commit -m "chore(release): $newTag"
+Invoke-Git @("add", ".")
 
 # -----------------------------
-# Git tag 생성
+# Git Commit
 # -----------------------------
-git tag -a $newTag -m "Release $newTag"
+Invoke-Git @("commit", "-m", "chore(release): $newTag")
+Write-Host "✅ Commit created"
+
+# -----------------------------
+# Git Tag
+# -----------------------------
+Invoke-Git @("tag", "-a", $newTag, "-m", "Release $newTag")
+Write-Host "🏷️ Tag created: $newTag"
 
 # -----------------------------
 # Push
 # -----------------------------
 if (-not $NoPush) {
 
-    $branch = git rev-parse --abbrev-ref HEAD
+    $branch = Invoke-Git @("rev-parse", "--abbrev-ref", "HEAD")
 
     Write-Host "📤 Push branch: $branch"
-    git push origin $branch
+    Invoke-Git @("push", "origin", $branch)
 
     Write-Host "📤 Push tag: $newTag"
-    git push origin $newTag
+    Invoke-Git @("push", "origin", $newTag)
 
 }
 else {
-    Write-Host "⏭️ Push 스킵"
+    Write-Host "⏭️ Push skipped"
 }
 
-Write-Host "✅ 릴리즈 완료: $newTag"
+Write-Host "🎉 Release completed: $newTag"

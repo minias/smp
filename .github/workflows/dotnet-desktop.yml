@@ -6,7 +6,7 @@ on:
     tags: ["v*"]
 
 env:
-  PROJECT_PATH: SMP.App/SMP.App.csproj
+  PROJECT_PATH: SMP/SMP.csproj
   OUTPUT_PATH: Output
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
       run: |
         Invoke-WebRequest `
           -Uri https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe `
-          -OutFile SMP.App/yt-dlp.exe
+          -OutFile SMP/yt-dlp.exe
 
     - name: Build
       run: dotnet build $env:PROJECT_PATH -c Release --no-restore
@@ -63,7 +63,7 @@ jobs:
       run: |
         Invoke-WebRequest `
           -Uri https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe `
-          -OutFile SMP.App/yt-dlp.exe
+          -OutFile SMP/yt-dlp.exe
 
     - name: Build
       run: |
