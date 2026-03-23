@@ -36,6 +36,7 @@ namespace SMP.UI
             LstPlaylist = new ListBox();
             TrackVolume = new TrackBar();
             LblVolume = new Label();
+            BtnLoop = new Button();
             ((System.ComponentModel.ISupportInitialize)TrackVolume).BeginInit();
             SuspendLayout();
             // 
@@ -73,7 +74,7 @@ namespace SMP.UI
             BtnPlay.Font = new Font("Segoe UI Emoji", 11F);
             BtnPlay.Location = new Point(14, 258);
             BtnPlay.Name = "BtnPlay";
-            BtnPlay.Size = new Size(110, 35);
+            BtnPlay.Size = new Size(80, 35);
             BtnPlay.TabIndex = 6;
             BtnPlay.Text = "▶️ 재생";
             BtnPlay.Click += BtnPlay_Click;
@@ -81,9 +82,9 @@ namespace SMP.UI
             // BtnNext
             // 
             BtnNext.Font = new Font("Segoe UI Emoji", 11F);
-            BtnNext.Location = new Point(140, 258);
+            BtnNext.Location = new Point(106, 258);
             BtnNext.Name = "BtnNext";
-            BtnNext.Size = new Size(110, 35);
+            BtnNext.Size = new Size(80, 35);
             BtnNext.TabIndex = 7;
             BtnNext.Text = "⏭️ 다음";
             BtnNext.Click += BtnNext_Click;
@@ -91,9 +92,9 @@ namespace SMP.UI
             // BtnStop
             // 
             BtnStop.Font = new Font("Segoe UI Emoji", 11F);
-            BtnStop.Location = new Point(262, 258);
+            BtnStop.Location = new Point(198, 258);
             BtnStop.Name = "BtnStop";
-            BtnStop.Size = new Size(110, 35);
+            BtnStop.Size = new Size(80, 35);
             BtnStop.TabIndex = 8;
             BtnStop.Text = "⏹️ 정지";
             BtnStop.Click += BtnStop_Click;
@@ -106,6 +107,8 @@ namespace SMP.UI
             LstPlaylist.Name = "LstPlaylist";
             LstPlaylist.Size = new Size(360, 124);
             LstPlaylist.TabIndex = 3;
+            LstPlaylist.MouseClick += LstPlaylist_MouseClick;
+            LstPlaylist.MouseDoubleClick += LstPlaylist_MouseDoubleClick;
             // 
             // TrackVolume
             // 
@@ -126,9 +129,20 @@ namespace SMP.UI
             LblVolume.TabIndex = 5;
             LblVolume.Text = "볼륨: 50%";
             // 
+            // BtnLoop
+            // 
+            BtnLoop.Font = new Font("Segoe UI Emoji", 11F);
+            BtnLoop.Location = new Point(290, 258);
+            BtnLoop.Name = "BtnLoop";
+            BtnLoop.Size = new Size(80, 35);
+            BtnLoop.TabIndex = 9;
+            BtnLoop.Text = "🔁 1회";
+            BtnLoop.Click += BtnLoop_Click;
+            // 
             // MainForm
             // 
             ClientSize = new Size(384, 300);
+            Controls.Add(BtnLoop);
             Controls.Add(TxtUrl);
             Controls.Add(BtnAdd);
             Controls.Add(BtnDel);
@@ -146,5 +160,7 @@ namespace SMP.UI
             ResumeLayout(false);
             PerformLayout();
         }
+
+        private Button BtnLoop;
     }
 }

@@ -1,18 +1,25 @@
 <#
 .SYNOPSIS
-SMP 자동 릴리즈 스크립트 (Release Branch 기반)
+SMP 자동 릴리즈 스크립트 (Production Ready)
 
 .DESCRIPTION
 - semantic version bump
-- release/vX.Y.Z 브랜치 생성
-- csproj <Version> 업데이트
 - commit 기반 CHANGELOG 자동 생성
 - git commit / tag / push
 - PowerShell 5.1 / 7 호환
+- UTF-8 출력 지원
+- 안정성 강화
+
+(1) Version 계산
+(2) SMP.csproj <Version> 업데이트   ← 추가
+(3) CHANGELOG 업데이트
+(4) git add
+(5) git commit
+(6) git tag
+(7) push
 #>
 
 param (
-    [Parameter(Mandatory = $false)]
     [ValidateSet("patch", "minor", "major")]
     [string]$Type,
 
@@ -33,87 +40,73 @@ USAGE:
   .\release.ps1 -Type <patch|minor|major> [options]
 
 OPTIONS:
-  -Type              Version bump type
+  -Type              Version bump type (patch | minor | major)
   -DryRun            Simulate without applying changes
   -NoPush            Skip git push
-  -SkipChangelog     Skip CHANGELOG update
+  -SkipChangelog     Do not update CHANGELOG.md
   -Help              Show help
+
+EXAMPLES:
+  .\release.ps1 -Type patch
+  .\release.ps1 -Type minor -DryRun
+  .\release.ps1 -Type major -NoPush
 "@
 }
 
 # -----------------------------
-# Help 처리 (명확한 분기)
+# Help / Argument Validation
 # -----------------------------
-if ($Help) {
-    Show-Help
-    exit 0
-}
-
-if (-not $Type) {
+if ($Help -or -not $Type) {
     Show-Help
     exit 0
 }
 
 # -----------------------------
-# Encoding
+# Encoding Setup (UTF-8)
 # -----------------------------
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 cmd /c chcp 65001 | Out-Null
 
+# -----------------------------
+# Global Settings
+# -----------------------------
 $ErrorActionPreference = "Stop"
 
 # -----------------------------
-# Git Wrapper
+# Git 실행 Wrapper
 # -----------------------------
 function Invoke-Git {
-    param ([string[]]$GitArgs)
+    param (
+        [Parameter(Mandatory=$true)]
+        [string[]]$GitArgs
+    )
 
     $result = & git @GitArgs 2>&1
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Git failed: git $($GitArgs -join ' ')`n$result"
+        throw "Git command failed: git $($GitArgs -join ' ')`n$result"
     }
 
     return $result
 }
 
 # -----------------------------
-# Branch Helpers
-# -----------------------------
-function Set-Branch {
-    param ([string]$Branch)
-
-    Invoke-Git @("checkout", $Branch)
-    Write-Host "🔀 Switched to: $Branch"
-}
-
-function New-ReleaseBranch {
-    param ([string]$Branch)
-
-    $exists = Invoke-Git @("branch", "--list", $Branch)
-
-    if ($exists) {
-        Write-Host "⚠️ Branch exists: $Branch"
-        Invoke-Git @("checkout", $Branch)
-    }
-    else {
-        Invoke-Git @("checkout", "-b", $Branch)
-        Write-Host "🌿 Created branch: $Branch"
-    }
-}
-
-# -----------------------------
-# Version Helpers
+# Get Latest Tag
 # -----------------------------
 function Get-LatestTag {
     try {
-        return (Invoke-Git @("describe", "--tags", "--abbrev=0")).Trim()
-    } catch {
+        $tag = Invoke-Git @("describe", "--tags", "--abbrev=0")
+        return $tag.Trim()
+    }
+    catch {
         return "v0.0.0"
     }
 }
 
+# -----------------------------
+# Parse Version
+# -----------------------------
 function Get-VersionInfo {
     param ([string]$tag)
 
@@ -121,7 +114,7 @@ function Get-VersionInfo {
     $parts = $clean.Split(".")
 
     if ($parts.Count -ne 3) {
-        throw "Invalid version: $tag"
+        throw "Invalid version format: $tag"
     }
 
     return @{
@@ -131,6 +124,9 @@ function Get-VersionInfo {
     }
 }
 
+# -----------------------------
+# Version Bump
+# -----------------------------
 function Update-Version {
     param ($version, $type)
 
@@ -153,7 +149,7 @@ function Update-Version {
 }
 
 # -----------------------------
-# csproj Version Update
+# ✅ csproj Version 업데이트 (추가)
 # -----------------------------
 function Update-CsprojVersion {
     param (
@@ -167,23 +163,25 @@ function Update-CsprojVersion {
 
     [xml]$xml = Get-Content $ProjectPath
 
-    foreach ($pg in $xml.Project.PropertyGroup) {
-        if ($pg.Version) {
-            $pg.Version = $Version
-            $xml.Save($ProjectPath)
-            Write-Host "🧩 csproj Version updated → $Version"
-            return
-        }
+    $pg = $xml.Project.PropertyGroup
+
+    if (-not $pg.Version) {
+        throw "<Version> not found in csproj"
     }
 
-    throw "<Version> not found in csproj"
+    # Version 값만 업데이트
+    $pg.Version = $Version
+
+    $xml.Save($ProjectPath)
+
+    Write-Host "🧩 csproj Version updated → $Version"
 }
 
 # -----------------------------
-# Repo Check
+# Git Repo Check
 # -----------------------------
 if (-not (Test-Path ".git")) {
-    throw "Not a git repository"
+    throw "Git repository not found."
 }
 
 # -----------------------------
@@ -197,116 +195,116 @@ $newVersionObj = Update-Version $version $Type
 
 $newVersion = "{0}.{1}.{2}" -f $newVersionObj.Major, $newVersionObj.Minor, $newVersionObj.Patch
 $newTag = "v$newVersion"
-$releaseBranch = "release/v$newVersion"
 
 Write-Host "🚀 Target Version: $newTag"
-Write-Host "🌿 Release Branch: $releaseBranch"
 
 if ($DryRun) {
-    Write-Host "🧪 DRY RUN"
+    Write-Host "🧪 DRY RUN - no changes applied"
     exit 0
 }
 
 # -----------------------------
-# Prepare Branch
-# -----------------------------
-Set-Branch "main"
-Invoke-Git @("pull", "origin", "main")
-
-New-ReleaseBranch $releaseBranch
-
-# -----------------------------
-# csproj Update
-# -----------------------------
-$csproj = Get-ChildItem -Recurse -Filter *.csproj |
-    Where-Object { $_.Name -eq "SMP.csproj" } |
-    Select-Object -First 1
-
-if (-not $csproj) {
-    throw "SMP.csproj not found"
-}
-
-Update-CsprojVersion $csproj.FullName $newVersion
-
-# -----------------------------
-# CHANGELOG
+# CHANGELOG Update (commit 기반 자동 생성)
 # -----------------------------
 if (-not $SkipChangelog) {
 
-    $path = "CHANGELOG.md"
+    $changelogPath = "CHANGELOG.md"
 
-    if (-not (Test-Path $path)) {
-        throw "CHANGELOG.md not found"
-    }
-
-    $content = Get-Content $path -Raw
-
-    if ($content -match "## \[$newVersion\]") {
-        throw "Version already exists in CHANGELOG"
+    if (-not (Test-Path $changelogPath)) {
+        throw "CHANGELOG.md not found."
     }
 
     $today = Get-Date -Format "yyyy-MM-dd"
+    $content = Get-Content $changelogPath -Raw
 
-    $logs = Invoke-Git @("log", "$latestTag..HEAD", "--pretty=format:%s")
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        throw "CHANGELOG.md is empty."
+    }
 
-    $fixes = @()
-    $features = @()
+    # 중복 버전 방지
+    if ($content -match "## \[$newVersion\]") {
+        throw "CHANGELOG already contains version $newVersion"
+    }
 
-    foreach ($log in $logs) {
-        if ($log.ToLower().StartsWith("fix")) {
-            $fixes += "- $log"
+    # 이전 태그 이후 commit 로그 가져오기
+    $commitLogs = Invoke-Git @("log", "$latestTag..HEAD", "--pretty=format:%s")
+
+    if (-not $commitLogs) {
+        $commitLogs = @()
+    }
+
+    # 분류
+    $bugFixes = @()
+    $improvements = @()
+
+    foreach ($log in $commitLogs) {
+
+        $lower = $log.ToLower()
+
+        if ($lower.StartsWith("fix")) {
+            $bugFixes += "- $log"
         }
-        elseif ($log.ToLower().StartsWith("feat")) {
-            $features += "- $log"
+        elseif ($lower.StartsWith("feat")) {
+            $improvements += "- $log"
         }
         else {
-            $features += "- $log"
+            $improvements += "- $log"
         }
     }
 
-    if ($fixes.Count -eq 0) { $fixes = @("- 없음") }
-    if ($features.Count -eq 0) { $features = @("- 없음") }
+    # 섹션 구성
+    $bugFixSection = if ($bugFixes.Count -gt 0) { $bugFixes -join "`n" } else { "- 없음" }
+    $improveSection = if ($improvements.Count -gt 0) { $improvements -join "`n" } else { "- 없음" }
 
+    # CHANGELOG 블록 생성
     $header = @"
 ## [$newVersion] - $today
 
 ### Bug Fixes
-$($fixes -join "`n")
+$bugFixSection
 
 ### Improvements
-$($features -join "`n")
+$improveSection
 
 "@
 
+    # prepend 방식 (맨 위 삽입)
     $updated = "# Changelog`n`n$header`n$content"
 
-    Set-Content -Path $path -Value $updated -Encoding UTF8
+    Set-Content -Path $changelogPath -Value $updated -Encoding UTF8
 
-    Write-Host "📝 CHANGELOG updated"
+    Write-Host "📝 CHANGELOG auto-generated from commits"
 }
+else {
+    Write-Host "⏭️ Skip CHANGELOG"
+}
+
+# -----------------------------
+# Git Add
+# -----------------------------
+Invoke-Git @("add", ".")
 
 # -----------------------------
 # Git Commit
 # -----------------------------
-Invoke-Git @("add", ".")
 Invoke-Git @("commit", "-m", "chore(release): $newTag")
-
 Write-Host "✅ Commit created"
 
 # -----------------------------
-# Tag
+# Git Tag
 # -----------------------------
 Invoke-Git @("tag", "-a", $newTag, "-m", "Release $newTag")
-
-Write-Host "🏷️ Tag created"
+Write-Host "🏷️ Tag created: $newTag"
 
 # -----------------------------
 # Push
 # -----------------------------
 if (-not $NoPush) {
 
-    Write-Host "📤 Push release branch: $releaseBranch"
-    Invoke-Git @("push", "-u", "origin", $releaseBranch)
+    $branch = Invoke-Git @("rev-parse", "--abbrev-ref", "HEAD")
+
+    Write-Host "📤 Push branch: $branch"
+    Invoke-Git @("push", "origin", $branch)
 
     Write-Host "📤 Push tag: $newTag"
     Invoke-Git @("push", "origin", $newTag)
@@ -316,4 +314,4 @@ else {
     Write-Host "⏭️ Push skipped"
 }
 
-Write-Host "🎉 Release completed → $newTag"
+Write-Host "🎉 Release completed: $newTag"

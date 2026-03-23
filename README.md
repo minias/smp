@@ -63,16 +63,21 @@ dotnet run --project SMP.App
 
 또는 Visual Studio에서 SMP.App을 시작 프로젝트로 설정 후 실행
 
-## 📦 빌드
+## 📦 빌드 및 릴리즈 자동화
 
 ```sh
-dotnet build -c Release
-```
+# 1. 버전 릴리즈(버그) 1.0.0 -> 1.0.1
+.\release.ps1 -Type patch
+# 1.1 버전 릴리즈(마이너) 1.0.3 -> 1.1.0
+.\release.ps1 -Type minor
+# 1.2 버전 릴리즈(메이저) 1.0.0 -> 2.0.0
+.\release.ps1 -Type major
 
-빌드 결과:
+# 2. 빌드/퍼블리시
+.\publish.ps1
 
-```sh
-SMP.App/bin/Release/net10.0-windows/win-x64/
+# 3. smp.iss 실행 및 빌드
+.\smp.iss 
 ```
 
 ## 📦 배포 (Installer)
