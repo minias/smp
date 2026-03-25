@@ -10,9 +10,9 @@ SMP는 Windows 기반 유튜브 링크로 백그라운드 재생하는 음악재
 
 ---
 
-## 📌 실행 버전
+## 📌 윈도우 설치 버전
 
-- 최신: **v1.2.0 (2026-03-26)**
+- 최신: [**v1.2.0 (2026-03-26)**](https://github.com/minias/smp/releases/download/v1.2.0/SMP_Setup_1.2.0.exe)
 
 ---
  
