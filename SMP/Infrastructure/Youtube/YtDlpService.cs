@@ -1,5 +1,5 @@
 ﻿// File: Infrastructure/Youtube/YtDlpService.cs
-
+using SMP.App.Interfaces;
 using System.Diagnostics;
 using System.Collections.Concurrent;
 
@@ -11,7 +11,7 @@ namespace SMP.Infrastructure.Youtube;
 /// - TTL 캐시
 /// - 중복 요청 방지 (async lock)
 /// </summary>
-public class YtDlpService(string exePath)
+public class YtDlpService(string exePath): IYoutubeService
 {
     private readonly string _exePath = exePath;
 

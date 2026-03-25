@@ -4,13 +4,14 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using SMP.App.Interfaces;
 
 namespace SMP.Infrastructure.Tray;
 
 /// <summary>
 /// 시스템 트레이 아이콘 관리 서비스
 /// </summary>
-public class TrayService : IDisposable
+public class TrayService : ITrayService, IDisposable
 {
     private readonly NotifyIcon _tray;
     private bool _disposed;

@@ -1,9 +1,12 @@
-// File: Program.cs
+// /UI/Program.cs
 
 using Microsoft.Extensions.DependencyInjection;
-using SMP.App;
+using NAudio.Wave;
 using SMP.App.Interfaces;
 using SMP.App.Service;
+using SMP.App.UseCases;
+using SMP.Infrastructure.Audio;
+using SMP.Infrastructure.Input;
 using SMP.Infrastructure.Storage;
 using SMP.Infrastructure.Tray;
 using SMP.Infrastructure.Update;
@@ -15,19 +18,50 @@ var services = new ServiceCollection();
 // yt-dlp 실행 파일 경로
 var exePath = Path.Combine(AppContext.BaseDirectory, "yt-dlp.exe");
 
-// ✅ 생성자 시그니처에 맞게 exePath만 전달
-services.AddSingleton(new YtDlpService(exePath));
 
-// core
-services.AddSingleton<PlayerService>();
+// =========================
+// Infrastructure
+// =========================
+services.AddSingleton<MediaKeyPatternDetector>();
+services.AddSingleton<MediaKeyListener>();
 
-// infra
-services.AddSingleton<TrayService>();
-services.AddSingleton<PlaylistRepository>();
+// =========================
+// Interface
+// =========================
+services.AddSingleton<IYoutubeService>(sp => new YtDlpService(exePath));
+
+services.AddSingleton<IWavePlayer, WaveOutEvent>();
+services.AddSingleton<IAudioPlayer, StreamingAudioPlayer>();
+services.AddSingleton<ITrayService, TrayService>();
+services.AddSingleton<IPlaylistRepository, PlaylistRepository>();
+
+// (선택) 업데이트
 services.AddSingleton<IUpdateService, UpdateService>();
 
+
+// =========================
+// App.Service
+// =========================
+services.AddSingleton<PlayerState>();
+services.AddSingleton<PlayerFacade>();
+
+// =========================
+// UseCase
+// =========================
+services.AddSingleton<PlayUseCase>();
+services.AddSingleton<PlayPauseUseCase>();
+services.AddSingleton<StopUseCase>();
+services.AddSingleton<PrevTrackUseCase>();
+services.AddSingleton<NextTrackUseCase>();
+services.AddSingleton<SetPlaylistUseCase>();
+services.AddSingleton<SetVolumeUseCase>();
+services.AddSingleton<SetLoopModeUseCase>();
+
+// =========================
 // UI
+// =========================
 services.AddSingleton<MainForm>();
+
 
 var provider = services.BuildServiceProvider();
 

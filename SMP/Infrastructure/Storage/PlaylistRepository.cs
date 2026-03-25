@@ -1,5 +1,6 @@
 ﻿// Infrastructure/Storage/PlaylistRepository.cs
 using SMP.Domain;
+using SMP.App.Interfaces;
 using System.Text.Json;
 using SMP.Infrastructure.Serialization;
 using System.Diagnostics;
@@ -11,7 +12,7 @@ namespace SMP.Infrastructure.Storage;
 /// - 사용자 로컬 AppData에 JSON 저장
 /// - 설치 폴더와 분리하여 쓰기 권한 문제 방지
 /// </summary>
-public class PlaylistRepository
+public class PlaylistRepository : IPlaylistRepository
 {
     private readonly string _filePath;
 

@@ -1,58 +1,90 @@
-﻿// UI/MainForm.cs
-using SMP.App;
+﻿// /UI/MainForm.cs
+
 using SMP.App.Interfaces;
 using SMP.App.Service;
+using SMP.App.UseCases;
 using SMP.Domain;
-using SMP.Infrastructure.Storage;
-using SMP.Infrastructure.Tray;
-using SMP.Infrastructure.Youtube;
+using SMP.Infrastructure.Input;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace SMP.UI;
 
 public partial class MainForm : Form
 {
-    private readonly PlayerService _player;
-    private readonly YtDlpService _yt;
-    private readonly TrayService _tray;
-    private readonly PlaylistRepository _repo;
-
-    // ✅ optional (DI 실패 대비)
+    private readonly IYoutubeService _yt;
+    private readonly ITrayService _tray;
+    private readonly IPlaylistRepository _repo;
     private readonly IUpdateService? _update;
+
+    private readonly PlayerState _state;
+
+    private readonly PlayUseCase _playUseCase;
+    private readonly NextTrackUseCase _nextUseCase;
+    private readonly StopUseCase _stopUseCase;
+    private readonly SetPlaylistUseCase _setPlaylistUseCase;
+    private readonly SetVolumeUseCase _setVolumeUseCase;
+    private readonly SetLoopModeUseCase _setLoopModeUseCase;
+    private readonly PrevTrackUseCase _prevUseCase;
+    private readonly PlayPauseUseCase _playPauseUseCase;
+
+    // ✅ MediaKey Detector 주입
+    private readonly MediaKeyListener _listener;
+    private readonly MediaKeyPatternDetector _media;
+
     /// <summary>
     /// 루프 상태
     /// </summary>
     private LoopMode _loopMode = LoopMode.None;
 
     public MainForm(
-        PlayerService player,
-        YtDlpService yt,
-        TrayService tray,
-        PlaylistRepository repo,
+        PlayerState state,
+        PlayUseCase playUseCase,
+        NextTrackUseCase nextUseCase,
+        StopUseCase stopUseCase,
+        PrevTrackUseCase prevUseCase,
+        SetPlaylistUseCase setPlaylistUseCase,
+        SetVolumeUseCase setVolumeUseCase,
+        SetLoopModeUseCase setLoopModeUseCase,
+        PlayPauseUseCase playPauseUseCase,
+        MediaKeyPatternDetector media,
+        MediaKeyListener listener,
+        IYoutubeService yt,
+        ITrayService tray,
+        IPlaylistRepository repo,
         IUpdateService? update = null)
     {
         InitializeComponent();
         InitForm();
 
-        _player = player;
+        _state = state;
+
+        _playUseCase = playUseCase;
+        _nextUseCase = nextUseCase;
+        _prevUseCase = prevUseCase;
+        _stopUseCase = stopUseCase;
+
+        _setPlaylistUseCase = setPlaylistUseCase;
+        _setVolumeUseCase = setVolumeUseCase;
+        _setLoopModeUseCase = setLoopModeUseCase;
+
+        _playPauseUseCase = playPauseUseCase;
+
+        _media = media;
+        _listener = listener;
+
         _yt = yt;
         _tray = tray;
         _repo = repo;
         _update = update;
 
+        BindMediaKeys(); // ✅ MediaKey 연결
         InitTray();
         BindEvents();
-
         InitVolume();
 
-        // ✅ 초기화 통합
         _ = InitializeAsync();
     }
 
-    /// <summary>
-    /// 초기화 (메인폼)
-    /// </summary>
     private void InitForm()
     {
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -62,55 +94,40 @@ public partial class MainForm : Form
         MinimumSize = Size;
         MaximumSize = Size;
 
-        // ✅ 기본값: 1회 재생
         _loopMode = LoopMode.None;
     }
 
-    /// <summary>
-    /// 초기화 (플레이리스트 + 업데이트)
-    /// </summary>
     private async Task InitializeAsync()
     {
         await SafeLoadAsync();
-        //await CheckUpdateAsync(); // 자동 업데이트 임시로 막음
     }
 
-    /// <summary>
-    /// 트레이 초기화
-    /// </summary>
     private void InitTray()
     {
         var menu = new ContextMenuStrip();
 
-        // ✅ 현재 선택된 인덱스 기준 재생
         menu.Items.Add("▶️ 재생", null, async (s, e) =>
         {
             int index = GetSelectedIndexOrDefault();
-            await _player.PlayAsync(index);
+            await _playUseCase.ExecuteAsync(index);
         });
 
-        // 다음곡
         menu.Items.Add("⏭️ 다음곡", null, async (s, e) =>
         {
-            await _player.NextAsync();
+            await _nextUseCase.ExecuteAsync();
         });
 
-        menu.Items.Add("⏹️ 정지", null, (s, e) => _player.Stop());
+        menu.Items.Add("⏹️ 정지", null, (s, e) => _stopUseCase.Execute());
         menu.Items.Add("🪟 열기", null, (s, e) => ShowMainWindow());
         menu.Items.Add("❌ 종료", null, (s, e) => Application.Exit());
 
         _tray.SetMenu(menu);
-
-        // ✅ 더블 클릭 버그 수정
         _tray.OnDoubleClick(() => ShowMainWindow());
     }
- 
-    /// <summary>
-    /// Player 이벤트 바인딩
-    /// </summary>
+
     private void BindEvents()
     {
-        _player.OnTrackChanged += item =>
+        _playUseCase.OnTrackChanged += item =>
         {
             if (IsDisposed) return;
 
@@ -120,10 +137,8 @@ public partial class MainForm : Form
                 _tray.SetTitle(item.Title);
                 _tray.Notify(item.Title);
 
-                // ✅ 현재 재생 인덱스 가져오기
-                int index = _player.GetCurrentIndex();
+                int index = _state.CurrentIndex;
 
-                // ✅ ListBox 선택 동기화
                 if (index >= 0 && index < LstPlaylist.Items.Count)
                 {
                     LstPlaylist.SelectedIndex = index;
@@ -131,22 +146,8 @@ public partial class MainForm : Form
                 }
             }));
         };
-        // TODO 향후버전에서 수정
-        //_player.OnStateChanged += state =>
-        //{
-        //    if (IsDisposed) return;
-
-        //    BeginInvoke(new Action(() =>
-        //    {
-        //        BtnPlay.Enabled = state != PlaybackState.Playing;
-        //        BtnStop.Enabled = state == PlaybackState.Playing;
-        //    }));
-        //};
     }
 
-    /// <summary>
-    /// 안전한 플레이리스트 로드
-    /// </summary>
     private async Task SafeLoadAsync()
     {
         try
@@ -156,12 +157,9 @@ public partial class MainForm : Form
             LstPlaylist.Items.Clear();
 
             foreach (var item in items)
-            {
                 LstPlaylist.Items.Add(item);
-            }
 
-            // ✅ PlayerService에 전체 리스트 동기화
-            _player.SetPlaylist(items);
+            _setPlaylistUseCase.Execute(items);
         }
         catch (Exception ex)
         {
@@ -169,58 +167,6 @@ public partial class MainForm : Form
         }
     }
 
-    /// <summary>
-    /// 업데이트 체크
-    /// </summary>
-    private async Task CheckUpdateAsync()
-    {
-        try
-        {
-            if (_update == null)
-                return;
-
-            var update = await _update.CheckForUpdateAsync();
-
-            if (update == null)
-                return;
-
-            if (IsDisposed)
-                return;
-
-            BeginInvoke(new Action(() =>
-            {
-                var result = MessageBox.Show(
-                    $"새 버전 {update.Version} 발견\n업데이트하시겠습니까?",
-                    "SMP 업데이트",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Information
-                );
-
-                if (result == DialogResult.Yes)
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await _update.DownloadAndInstallAsync(update);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[Update Install Error] {ex}");
-                        }
-                    });
-                }
-            }));
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Update Error] {ex}");
-        }
-    }
-
-    /// <summary>
-    /// 최소화 시 트레이
-    /// </summary>
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
@@ -229,9 +175,6 @@ public partial class MainForm : Form
             Hide();
     }
 
-    /// <summary>
-    /// 트레이에서 창 열기
-    /// </summary>
     private void ShowMainWindow()
     {
         if (IsDisposed) return;
@@ -245,19 +188,13 @@ public partial class MainForm : Form
         if (!Visible)
             Show();
 
-        // 🔥 항상 복원
         WindowState = FormWindowState.Normal;
-
-        // 🔥 사이즈 복원
         Size = MaximumSize;
 
         BringToFront();
         Activate();
     }
 
-    /// <summary>
-    /// URL 추가
-    /// </summary>
     private async void BtnAdd_Click(object sender, EventArgs e)
     {
         var url = TxtUrl.Text.Trim();
@@ -265,7 +202,6 @@ public partial class MainForm : Form
 
         try
         {
-            // 중복 방지
             if (LstPlaylist.Items.Cast<PlaylistItem>().Any(x => x.Url == url))
             {
                 MessageBox.Show("이미 추가된 URL입니다.");
@@ -282,9 +218,8 @@ public partial class MainForm : Form
 
             LstPlaylist.Items.Add(item);
 
-            // ✅ 리스트 전체를 PlayerService와 동기화
             var items = LstPlaylist.Items.Cast<PlaylistItem>().ToList();
-            _player.SetPlaylist(items);
+            _setPlaylistUseCase.Execute(items);
 
             TxtUrl.Clear();
         }
@@ -294,76 +229,40 @@ public partial class MainForm : Form
         }
     }
 
-    /// <summary>
-    /// 재생
-    /// </summary>
     private async void BtnPlay_Click(object sender, EventArgs e)
     {
-        try
-        {
-            ///@TODO 향후 다시 
-            ///BtnPlay.Enabled = false;
-            int index = GetSelectedIndexOrDefault();
-            await _player.PlayAsync(index);
-            //BtnPlay.Enabled = true;
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"재생 실패: {ex.Message}");
-        }
+        int index = GetSelectedIndexOrDefault();
+        await _playUseCase.ExecuteAsync(index);
     }
 
-    /// <summary>
-    /// 다음곡
-    /// </summary>
     private async void BtnNext_Click(object sender, EventArgs e)
     {
-        try
-        {
-            await _player.NextAsync();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"다음곡 실패: {ex.Message}");
-        }
+        await _nextUseCase.ExecuteAsync();
     }
 
-    /// <summary>
-    /// 정지
-    /// </summary>
     private void BtnStop_Click(object sender, EventArgs e)
     {
-        _player.Stop();
+        _stopUseCase.Execute();
         this.Text = "SMP Player";
     }
 
-    /// <summary>
-    /// 일시 정지
-    /// </summary>
     public void Pause()
     {
-        _player.Stop(); // 현재 구조상 Stop 기반
+        _stopUseCase.Execute();
         this.Text = "SMP Player";
     }
 
-    /// <summary>
-    /// 삭제
-    /// </summary>
     private void BtnDel_Click(object sender, EventArgs e)
     {
         if (LstPlaylist.SelectedItem is PlaylistItem item)
         {
             LstPlaylist.Items.Remove(item);
 
-            // ✅ 삭제 후 PlayerService 동기화
             var items = LstPlaylist.Items.Cast<PlaylistItem>().ToList();
-            _player.SetPlaylist(items);
+            _setPlaylistUseCase.Execute(items);
         }
     }
 
-    /// <summary>
-    /// 선택 인덱스 반환 (없으면 0)
-    /// </summary>
     private int GetSelectedIndexOrDefault()
     {
         if (LstPlaylist.SelectedIndex >= 0)
@@ -372,45 +271,29 @@ public partial class MainForm : Form
         return 0;
     }
 
-    /// <summary>
-    /// 볼륨 초기화
-    /// </summary>
     private void InitVolume()
     {
         TrackVolume.Value = 50;
-        _player.SetVolume(0.5f);
+        _setVolumeUseCase.Execute(0.5f);
         LblVolume.Text = "볼륨: 50%";
     }
 
-    /// <summary>
-    /// 볼륨 변경
-    /// </summary>
     private void TrackVolume_Scroll(object sender, EventArgs e)
     {
         float volume = TrackVolume.Value / 100f;
-
-        _player.SetVolume(volume);
+        _setVolumeUseCase.Execute(volume);
         LblVolume.Text = $"볼륨: {TrackVolume.Value}%";
     }
 
-    /// <summary>
-    /// 종료 시 저장
-    /// </summary>
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         try
         {
-            var items = LstPlaylist.Items
-                .Cast<PlaylistItem>()
-                .ToList();
-
+            var items = LstPlaylist.Items.Cast<PlaylistItem>().ToList();
             _ = _repo.SaveAsync(items);
             _tray.Dispose();
         }
-        catch
-        {
-            // 종료 중 예외 무시
-        }
+        catch { }
 
         base.OnFormClosing(e);
     }
@@ -425,13 +308,10 @@ public partial class MainForm : Form
             _ => LoopMode.None
         };
 
-        _player.SetLoopMode(_loopMode);
+        _setLoopModeUseCase.Execute(_loopMode);
         UpdateLoopButtonUI();
     }
 
-    /// <summary>
-    /// 루프 버튼 UI 갱신
-    /// </summary>
     private void UpdateLoopButtonUI()
     {
         BtnLoop.Text = _loopMode switch
@@ -443,41 +323,92 @@ public partial class MainForm : Form
         };
     }
 
- 
     private void LstPlaylist_MouseClick(object sender, MouseEventArgs e)
     {
         int index = LstPlaylist.IndexFromPoint(e.Location);
+        if (index == ListBox.NoMatches) return;
 
-        if (index == ListBox.NoMatches)
-            return;
-        // 🔹 선택만 변경
         LstPlaylist.SelectedIndex = index;
-
-        // 🔹 기존 재생 중이면 정지
-        _player.Stop();
+        _stopUseCase.Execute();
         this.Text = "SMP Player";
     }
 
     private async void LstPlaylist_MouseDoubleClick(object sender, MouseEventArgs e)
     {
-        try
-        {
+        int index = LstPlaylist.IndexFromPoint(e.Location);
+        if (index == ListBox.NoMatches) return;
 
-            int index = LstPlaylist.IndexFromPoint(e.Location);
+        LstPlaylist.SelectedIndex = index;
+        await _playUseCase.ExecuteAsync(index);
+    }
 
-            if (index == ListBox.NoMatches)
-                return;
+    /// <summary>
+    /// MediaKey 바인딩
+    /// </summary>
+    private void BindMediaKeys()
+    {
+        _media.OnNext -= HandleNext;
+        _media.OnPrevious -= HandlePrevious;
+        _media.OnPlayPause -= HandlePlayPause;
+        _media.OnVolumeUp -= HandleVolumeUp;
+        _media.OnVolumeDown -= HandleVolumeDown;
 
-            // 🔥 더블클릭 → 선택 + 재생
-            LstPlaylist.SelectedIndex = index;
+        _media.OnNext += HandleNext;
+        _media.OnPrevious += HandlePrevious;
+        _media.OnPlayPause += HandlePlayPause;
+        _media.OnVolumeUp -= HandleVolumeUp;
+        _media.OnVolumeDown -= HandleVolumeDown;
+    }
 
-            // 더블클릭 → 재생        
-            await _player.PlayAsync(index);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"더블클릭 재생 실패: {ex.Message}");
-        }
-     
+    /// <summary>
+    /// Next Track
+    /// </summary>
+    private async void HandleNext()
+    {
+        await _nextUseCase.ExecuteAsync();
+    }
+
+    /// <summary>
+    /// Previous Track
+    /// </summary>
+    private async void HandlePrevious()
+    {
+        await _prevUseCase.ExecuteAsync();
+    }
+
+    /// <summary>
+    /// Play / Pause Toggle
+    /// </summary>
+    private async void HandlePlayPause()
+    {
+        await _playPauseUseCase.ExecuteAsync();
+    }
+
+    /// <summary>
+    /// Volume Up
+    /// </summary>
+    private void HandleVolumeUp()
+    {
+        int value = TrackVolume.Value;
+        value = Math.Min(100, value + 5);
+
+        TrackVolume.Value = value;
+        _setVolumeUseCase.Execute(value / 100f);
+
+        LblVolume.Text = $"볼륨: {value}%";
+    }
+
+    /// <summary>
+    /// Volume Down
+    /// </summary>
+    private void HandleVolumeDown()
+    {
+        int value = TrackVolume.Value;
+        value = Math.Max(0, value - 5);
+
+        TrackVolume.Value = value;
+        _setVolumeUseCase.Execute(value / 100f);
+
+        LblVolume.Text = $"볼륨: {value}%";
     }
 }
