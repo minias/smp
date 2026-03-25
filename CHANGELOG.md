@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0] - 2026-03-26
+
+### Bug Fixes
+- 없음
+
+### Improvements
+- manual release v1.1.0
+- workflows update
+- workflows update
+- Merge pull request #1 from minias/release/v1.1.0
+- smp.iss 1.1.0 update
+- Changelog update
+
+# Changelog
+
 ## [1.1.0] - 2026-03-24
 
 ### Added
@@ -65,4 +80,5 @@
 - 플레이리스트 관리
 - 트레이 기능
 - 유튜브 연동
+
 
