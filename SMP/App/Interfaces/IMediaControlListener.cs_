@@ -1,0 +1,12 @@
+﻿// App/Interfaces/IMediaControlListener.cs
+namespace SMP.App.Interfaces;
+
+/// <summary>
+/// 외부 미디어 키 이벤트 수신 인터페이스
+/// </summary>
+public interface IMediaControlListener
+{
+    event Action OnNext;
+    event Action OnPrevious;
+    event Action OnPlayPause;
+}

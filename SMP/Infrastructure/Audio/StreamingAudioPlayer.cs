@@ -2,7 +2,7 @@
 
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
-using SMP.App.Ports;
+using SMP.App.Interfaces;
 
 namespace SMP.Infrastructure.Audio;
 
@@ -10,12 +10,10 @@ namespace SMP.Infrastructure.Audio;
 /// 스트리밍 오디오 플레이어 (NAudio 기반)
 /// - URL 기반 스트리밍 재생
 /// - 볼륨 제어 지원
+/// - Pause / Resume 지원
 /// - 재생 종료 이벤트 제공
 /// </summary>
-/// <remarks>
-/// 생성자 (DI)
-/// </remarks>
-public class StreamingAudioPlayer(IWavePlayer output) : IAudioPlayer, IDisposable
+public class StreamingAudioPlayer(IWavePlayer output) : IAudioPlayer
 {
     /// <summary>
     /// 오디오 출력 장치 (DI)
@@ -38,17 +36,14 @@ public class StreamingAudioPlayer(IWavePlayer output) : IAudioPlayer, IDisposabl
     private float _currentVolume = 0.5f;
 
     /// <summary>
-    /// 이벤트 핸들러 참조 (해제용)
-    /// </summary>
-    private EventHandler<StoppedEventArgs>? _playbackStoppedHandler;
-
-    /// <summary>
     /// 재생 종료 이벤트
     /// </summary>
     public event EventHandler<StoppedEventArgs>? OnPlaybackStopped;
 
+    private bool _disposed;
+
     /// <summary>
-    /// 비동기 재생 (인터페이스 구현)
+    /// 비동기 재생
     /// </summary>
     public Task PlayAsync(string url)
     {
@@ -61,10 +56,9 @@ public class StreamingAudioPlayer(IWavePlayer output) : IAudioPlayer, IDisposabl
     /// </summary>
     private void PlayInternal(string url)
     {
-        // 기존 리소스 정리
         Stop();
 
-        // 1. Reader 생성 (디코딩)
+        // 1. Reader 생성
         _reader = new MediaFoundationReader(url);
 
         // 2. SampleProvider 변환
@@ -76,17 +70,43 @@ public class StreamingAudioPlayer(IWavePlayer output) : IAudioPlayer, IDisposabl
             Volume = _currentVolume
         };
 
-        // 4. 이벤트 핸들러 등록
-        _playbackStoppedHandler = (s, e) =>
-        {
-            OnPlaybackStopped?.Invoke(this, e);
-        };
-
-        _output.PlaybackStopped += _playbackStoppedHandler;
+        // 4. 이벤트 핸들러 (단일 구조)
+        _output.PlaybackStopped -= HandlePlaybackStopped;
+        _output.PlaybackStopped += HandlePlaybackStopped;
 
         // 5. 초기화 및 재생
         _output.Init(_volumeProvider);
         _output.Play();
+    }
+
+    /// <summary>
+    /// Pause
+    /// </summary>
+    public void Pause()
+    {
+        if (_output.PlaybackState == PlaybackState.Playing)
+        {
+            _output.Pause();
+        }
+    }
+
+    /// <summary>
+    /// Resume
+    /// </summary>
+    public void Resume()
+    {
+        if (_output.PlaybackState == PlaybackState.Paused)
+        {
+            _output.Play();
+        }
+    }
+
+    /// <summary>
+    /// 현재 상태 반환
+    /// </summary>
+    public PlaybackState GetPlaybackState()
+    {
+        return _output.PlaybackState;
     }
 
     /// <summary>
@@ -96,7 +116,6 @@ public class StreamingAudioPlayer(IWavePlayer output) : IAudioPlayer, IDisposabl
     {
         _currentVolume = Math.Clamp(volume, 0f, 1f);
 
-        // 현재 재생 중이면 즉시 반영
         _volumeProvider?.Volume = _currentVolume;
     }
 
@@ -107,21 +126,13 @@ public class StreamingAudioPlayer(IWavePlayer output) : IAudioPlayer, IDisposabl
     {
         try
         {
-            // 이벤트 핸들러 제거
-            if (_playbackStoppedHandler != null)
-            {
-                _output.PlaybackStopped -= _playbackStoppedHandler;
-                _playbackStoppedHandler = null;
-            }
-
             _output.Stop();
         }
         catch
         {
-            // 종료 중 예외 무시 (NAudio 특성)
+            // NAudio 내부 예외 무시
         }
 
-        // 리소스 해제
         _reader?.Dispose();
         _reader = null;
 
@@ -129,15 +140,37 @@ public class StreamingAudioPlayer(IWavePlayer output) : IAudioPlayer, IDisposabl
     }
 
     /// <summary>
-    /// Dispose 패턴
+    /// 내부 이벤트 처리
+    /// </summary>
+    private void HandlePlaybackStopped(object? sender, StoppedEventArgs e)
+    {
+        OnPlaybackStopped?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Dispose
     /// </summary>
     public void Dispose()
     {
-        Stop();
-
-        // 출력 장치 해제
-        _output.Dispose();
-
+        Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// 실제 Dispose 로직
+    /// </summary>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+
+        if (disposing)
+        {
+            _output.PlaybackStopped -= HandlePlaybackStopped;
+
+            Stop();
+            _output.Dispose();
+        }
+
+        _disposed = true;
     }
 }
