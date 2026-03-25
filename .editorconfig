@@ -2,3 +2,4 @@
 
 # CA1513: ObjectDisposedException throw 도우미 사용
 dotnet_diagnostic.CA1513.severity = suggestion
+dotnet_diagnostic.IDE0290.severity = none
